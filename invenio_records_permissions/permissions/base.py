@@ -11,6 +11,7 @@ from invenio_access import Permission
 from ..generators import Deny
 
 
+# Guillaume: We want inheritance from it, so we can ditch the leading `_`
 class _PermissionConfig(object):
 
     # Deny all by default
@@ -19,6 +20,8 @@ class _PermissionConfig(object):
     can_read = [Deny]
     can_update = [Deny]
     can_delete = [Deny]
+    # Guillaume: 'actions' -> [] mapping
+    # Why not merge this with BasePermission or perhaps investigate Meta class
 
     @classmethod
     def get_permission_list(cls, action):
@@ -62,6 +65,7 @@ class BasePermission(Permission):
     def __init__(self, config, action):
         super(BasePermission, self).__init__()
         self.config = config
+        # Guillaume: Store action just in case
         self.permission_list = self.config.get_permission_list(action)
 
     @property

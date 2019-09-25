@@ -26,6 +26,7 @@ class _Config(object):
     @classmethod
     def config(cls):
         if not cls._config:
+            # Guillaume: Can get away with configuring it in the config.py
             class_name = current_app.config.get(
                 'RECORDS_PERMISSIONS_RECORD_FACTORY'
             )
@@ -37,6 +38,9 @@ class _Config(object):
 
 
 # Record factories
+
+# Guillaume: Why not pass the Permission object directly to the
+#            places that want it?
 def record_list_permission_factory(*args, **kwargs):
     return RecordPermission(action='list', config=_Config.config())
 
@@ -96,13 +100,14 @@ class RecordPermissionConfig(_PermissionConfig):
 
     - Create action given to no one. Not even superusers. To achieve this
       behaviour you need to define a ``Superuser`` need generator.
+      # Guillaume: Investigate Deny claim
     - Read access given to everyone.
     - Update access given to record owners.
     - Delete access given to admins only.
     """
     can_list = [AnyUser]
     can_create = [Deny]
-    can_read = [AnyUserIfPublic, RecordOwners]
+    can_read = [AnyUserIfPublic, RecordOwners]  # LoggedUserIfRestricted, UsersSharedWith
     can_read_files = [AnyUserIfPublicFiles, RecordOwners]
     can_update = [RecordOwners]
     can_delete = [Admin]
@@ -127,19 +132,25 @@ class RecordPermissionConfig(_PermissionConfig):
         return []
 
 
+# Guillaume: Why not merge these 2 together? We suggest merge because
+#            there is coupling between `needs_generator.needs(...)`
+#            calls and the get_permission_list return value
 class RecordPermission(BasePermission):
 
+    # Guillaume: config and action should have same order as BasePermission __init__
     def __init__(self, action, config=RecordPermissionConfig, record=None,
                  bucket=None):
+
         super(RecordPermission, self).__init__(config, action)
         self.record = record
-        self.bucket = bucket
+        self.bucket = bucket  # Guillaume: Isn't there a way to retrieve a record's bucket?
 
     @property
     def needs(self):
         needs = []
         for needs_generator in self.permission_list:
             tmp_needs = None
+            # Guillaume: this is what would be cause for merger
             if isinstance(needs_generator, _RecordNeedClass):
                 tmp_needs = needs_generator.needs(self.record)
             elif isinstance(needs_generator, _BucketNeedClass):

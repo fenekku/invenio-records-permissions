@@ -94,6 +94,11 @@ class _RecordOwners(_RecordNeedClass):
             owner_needs.append(UserNeed(owner))
         return owner_needs
 
+    # WHY?: Isn't the pattern: query_filter(self, record)
+    # if current_user id in record.get('owners', []):
+    #    return Q('terms', owners=current_user.id)
+    # else:
+    #   return None
     def query_filter(self):
         provides = g.identity.provides
         for need in provides:
