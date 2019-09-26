@@ -21,6 +21,7 @@ tests_require = [
     'isort>=4.3.3',
     'pydocstyle>=2.0.0',
     'pytest-cov>=2.5.1',
+    'pytest-mock>=1.6.0',
     'pytest-pep8>=1.0.6',
     'pytest-invenio>=1.0.5',
     'invenio-accounts>=1.1.1,<1.2.0'

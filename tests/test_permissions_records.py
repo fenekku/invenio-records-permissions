@@ -6,6 +6,7 @@
 # and/or modify it under the terms of the MIT License; see LICENSE file for
 # more details.
 
+from flask_login import current_user
 from flask_principal import ActionNeed, UserNeed, Need
 from invenio_records_permissions.permissions.records import \
     record_create_permission_factory, record_list_permission_factory, \
@@ -29,23 +30,63 @@ record = {
 }
 
 
-def test_record_permission(app):
+# def test_record_permission(app):
 
-    create_perm = record_create_permission_factory(record)
-    list_perm = record_list_permission_factory()  # No record needed
+#     create_perm = record_create_permission_factory(record)
+#     list_perm = record_list_permission_factory()  # No record needed
+#     read_perm = record_read_permission_factory(record)
+#     read_files_perm = record_read_files_permission_factory(record)
+#     update_perm = record_update_permission_factory(record)
+#     delete_perm = record_delete_permission_factory(record)
+
+#     assert create_perm.needs == {superuser_access}
+#     # FIXME: will fail because invenio-access adds all in 'needs'
+#     # https://github.com/inveniosoftware/invenio-access/issues/165
+#     assert create_perm.excludes == {any_user}
+
+#     # Loading permissions in invenio-access always add superuser
+#     assert list_perm.needs == {superuser_access, any_user}
+#     assert list_perm.excludes == set()
+
+#     assert read_perm.needs == {
+#         superuser_access,
+#         UserNeed(1),
+#         UserNeed(2),
+#         UserNeed(3)
+#     }
+#     assert read_perm.excludes == set()
+#     assert read_perm.query_filter == [
+#         Q('term', **{"_access.metadata_restricted": False}),
+#         Q('term', owners=1)
+#     ]
+
+#     assert read_files_perm.needs == {
+#         superuser_access,
+#         UserNeed(1),
+#         UserNeed(2),
+#         UserNeed(3)
+#     }
+#     assert read_perm.excludes == set()
+
+#     update_needs = update_perm.needs
+#     assert len(update_needs) == 3
+#     assert UserNeed(1) in update_needs
+#     assert UserNeed(2) in update_needs
+#     assert UserNeed(3) in update_needs
+#     assert update_perm.excludes == set()
+
+#     assert delete_perm.needs == {ActionNeed('admin-access')}
+#     assert delete_perm.excludes == set()
+
+
+def test_record_read_permission_factory(app, mocker):
+    patched_user = mocker.patch(
+        'invenio_records_permissions.generators.current_user')
+    patched_user.is_authenticated = True
+    patched_user.get_id = lambda: 1
+
+    # assumes identity + provides are well extracted from user
     read_perm = record_read_permission_factory(record)
-    read_files_perm = record_read_files_permission_factory(record)
-    update_perm = record_update_permission_factory(record)
-    delete_perm = record_delete_permission_factory(record)
-
-    assert create_perm.needs == {superuser_access}
-    # FIXME: will fail because invenio-access adds all in 'needs'
-    # https://github.com/inveniosoftware/invenio-access/issues/165
-    assert create_perm.excludes == {any_user}
-
-    # Loading permissions in invenio-access always add superuser
-    assert list_perm.needs == {superuser_access, any_user}
-    assert list_perm.excludes == set()
 
     assert read_perm.needs == {
         superuser_access,
@@ -53,26 +94,16 @@ def test_record_permission(app):
         UserNeed(2),
         UserNeed(3)
     }
-    assert read_perm.excludes == set()
-    assert read_perm.query_filter == [
+    assert read_perm.excludes == set()  # See Pablo's issue
+    assert read_perm.query_filters == [
         Q('term', **{"_access.metadata_restricted": False}),
         Q('term', owners=1)
     ]
 
-    assert read_files_perm.needs == {
-        superuser_access,
-        UserNeed(1),
-        UserNeed(2),
-        UserNeed(3)
-    }
-    assert read_perm.excludes == set()
 
-    update_needs = update_perm.needs
-    assert len(update_needs) == 3
-    assert UserNeed(1) in update_needs
-    assert UserNeed(2) in update_needs
-    assert UserNeed(3) in update_needs
-    assert update_perm.excludes == set()
+def test_record_list_permission_factory(app):
+    list_perm = record_list_permission_factory()  # No record needed
 
-    assert delete_perm.needs == {ActionNeed('admin-access')}
-    assert delete_perm.excludes == set()
+    # Loading permissions in invenio-access always add superuser
+    assert list_perm.needs == {superuser_access, any_user}
+    assert list_perm.excludes == set()

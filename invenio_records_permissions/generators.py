@@ -6,33 +6,35 @@
 # and/or modify it under the terms of the MIT License; see LICENSE file for
 # more details.
 
+# Guillaume: Rename file to gates.py and these "generators" to "gates"
 import json
 
 from elasticsearch_dsl.query import Q
 from flask import g
 from flask_principal import ActionNeed, UserNeed
+from flask_login import current_user
 from invenio_access.permissions import any_user
 from invenio_files_rest.models import Bucket, ObjectVersion
 from invenio_records_files.api import Record
 from invenio_records_files.models import RecordsBuckets
 
 
-class _NeedClass(object):
+class Gate(object):
 
-    def needs(self):
-        pass
+    def needs(self, **over):
+        return []
 
-    def excludes(self):
-        pass
+    def excludes(self, **over):
+        return []
 
-    def query_filter(self):
-        pass
+    def query_filter(self, **over):
+        return []
 
 
-class _AnyUser(_NeedClass):
+class AnyUser(Gate):
 
     def __init__(self):
-        super(_AnyUser, self).__init__()
+        super(AnyUser, self).__init__()
 
     def needs(self):
         return [any_user]
@@ -41,10 +43,7 @@ class _AnyUser(_NeedClass):
         return Q('match_all')  # match all query
 
 
-AnyUser = _AnyUser()
-
-
-class _Deny(_NeedClass):
+class _Deny(Gate):
 
     def __init__(self):
         super(_Deny, self).__init__()
@@ -59,7 +58,7 @@ class _Deny(_NeedClass):
 Deny = _Deny()
 
 
-class _Admin(_NeedClass):
+class _Admin(Gate):
 
     def __init__(self):
         super(_Admin, self).__init__()
@@ -71,7 +70,7 @@ class _Admin(_NeedClass):
 Admin = _Admin()
 
 
-class _RecordNeedClass(_NeedClass):
+class _RecordNeedClass(Gate):
 
     def __init__(self):
         super(_RecordNeedClass, self).__init__()
@@ -83,33 +82,31 @@ class _RecordNeedClass(_NeedClass):
         pass
 
 
-class _RecordOwners(_RecordNeedClass):
+class RecordOwners(Gate):
 
-    def __init__(self):
-        super(_RecordOwners, self).__init__()
+    def needs(self, record=None, **rest_over):
+        # owner_needs = []
+        # for owner in record.get('owners', []):
+        #     owner_needs.append(UserNeed(owner))
+        # return owner_needs
+        return [UserNeed(owner) for owner in record.get('owners', [])]
 
-    def needs(self, record):
-        owner_needs = []
-        for owner in record.get('owners', []):
-            owner_needs.append(UserNeed(owner))
-        return owner_needs
-
-    # WHY?: Isn't the pattern: query_filter(self, record)
-    # if current_user id in record.get('owners', []):
-    #    return Q('terms', owners=current_user.id)
-    # else:
-    #   return None
-    def query_filter(self):
-        provides = g.identity.provides
-        for need in provides:
-            if need.method == 'id':
-                return Q('term', owners=need.value)
-        return None
+    def query_filter(self, record=None, **rest_over):
+        # Filters for current_user as owner
+        user_id = (
+            current_user.get_id() if current_user.is_authenticated else None
+        )
+        if record and user_id in record.get('owners', []):
+            return Q('term', owners=user_id)
+        else:
+            return None
 
 
-RecordOwners = _RecordOwners()
+# RecordOwners = _RecordOwners()
 
 
+# Guillaume: should not be different than RecordOwners, right?
+# (should not be necessary)
 class _DepositOwners(_RecordNeedClass):
 
     def __init__(self):
@@ -132,42 +129,58 @@ class _DepositOwners(_RecordNeedClass):
 DepositOwners = _DepositOwners()
 
 
-class IfPublicRecordFactory(_RecordNeedClass):
+# class IfPublicRecordFactory(_RecordNeedClass):
 
-    def __init__(self, is_restricted, es_filter):
-        super(IfPublicRecordFactory, self).__init__()
-        self.is_restricted = is_restricted
-        self.es_filter = es_filter
+#     def __init__(self, is_restricted, es_filter):
+#         super(IfPublicRecordFactory, self).__init__()
+#         self.is_restricted = is_restricted
+#         self.es_filter = es_filter
 
-    def needs(self, record, *args, **kwargs):
-        if not self.is_restricted(record, *args, **kwargs):
-            return [any_user]
-        else:
-            return None
+#     def needs(self, record, *args, **kwargs):
+#         if not self.is_restricted(record, *args, **kwargs):
+#             return [any_user]
+#         else:
+#             return None
 
-    def excludes(self, record, *args, **kwargs):
-        pass
+#     def excludes(self, record, *args, **kwargs):
+#         pass
+
+#     def query_filter(self, *args, **kwargs):
+#         return self.es_filter(*args, **kwargs)
+
+
+# def _is_restricted(record, *args, **kwargs):
+#     if record:
+#         # FIXME: this should be caster to boolean when loaded
+#         return json.loads(record['_access']['metadata_restricted'])
+
+#     return True  # Restrict by default
+
+
+# def _is_restricted_filter(*args, **kwargs):
+#     return Q('term', **{"_access.metadata_restricted": False})
+
+
+class AnyUserIfPublic(object):
+    """Permission condition."""
+    def needs(self, record=None, **rest_over):
+        is_restricted = bool(  # to be extra safe, but not really necessary
+            record.get('_access', {}).get('metadata_restricted', False)
+        )
+        return [any_user] if record and not is_restricted else []
+
+    def excludes(self, record=None, **rest_over):
+        return []
 
     def query_filter(self, *args, **kwargs):
-        return self.es_filter(*args, **kwargs)
+        return Q('term', **{"_access.metadata_restricted": False})
+        # return self.es_filter(*args, **kwargs)
 
 
-def _is_restricted(record, *args, **kwargs):
-    if record:
-        # FIXME: this should be caster to boolean when loaded
-        return json.loads(record['_access']['metadata_restricted'])
-
-    return True  # Restrict by default
+# AnyUserIfPublic = IfPublicRecordFactory(_is_restricted, _is_restricted_filter)
 
 
-def _is_restricted_filter(*args, **kwargs):
-    return Q('term', **{"_access.metadata_restricted": False})
-
-
-AnyUserIfPublic = IfPublicRecordFactory(_is_restricted, _is_restricted_filter)
-
-
-class _BucketNeedClass(_NeedClass):
+class _BucketNeedClass(Gate):
 
     def __init__(self):
         super(_BucketNeedClass, self).__init__()
