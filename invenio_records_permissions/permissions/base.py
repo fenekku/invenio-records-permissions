@@ -140,3 +140,29 @@ class BasePermission(Permission):
             gate.query_filter(**self.over) for gate in self.gate_list
         ]
         return [f for f in filters if f]
+
+    @property
+    def gate_list(self):  # gates for action
+        # TODO: Perhaps use Meta programming here to also take care of this
+        #       for developers
+        action = self.action
+        cls = self.__class__
+        if hasattr(cls, 'can_' + action):
+            return getattr(cls, 'can_' + action)
+
+        # if action == 'create':
+        #     return cls.can_create
+        # elif action == 'list':
+        #     return cls.can_list
+        # elif action == 'read':
+        #     return cls.can_read
+        # elif action == 'read_files':
+        #     return cls.can_read_files
+        # elif action == 'update':
+        #     return cls.can_update
+        # elif action == 'delete':
+        #     return cls.can_delete
+
+        current_app.logger.error("Unkown action {action}.".format(
+            action=action))
+        return []

@@ -123,6 +123,8 @@ def _unknwon_generator(class_name):
 ####################
 
 
+# Guillaume: Hoster only needs to define this (Policy) and potentially Gates
+#            if they need a different policy then the default one
 class RecordPermissionPolicy(BasePermission):
     """Access control configuration for records.
 
@@ -142,69 +144,6 @@ class RecordPermissionPolicy(BasePermission):
     can_update = [RecordOwners]
     # - Delete access given to admins only.
     can_delete = [Admin]
-
-
-    @property
-    def gate_list(self):  # gates for action
-        # TODO: Perhaps use Meta programming here to also take care of this
-        #       for developers
-        action = self.action
-        cls = self.__class__
-        if action == 'create':
-            return cls.can_create
-        elif action == 'list':
-            return cls.can_list
-        elif action == 'read':
-            return cls.can_read
-        elif action == 'read_files':
-            return cls.can_read_files
-        elif action == 'update':
-            return cls.can_update
-        elif action == 'delete':
-            return cls.can_delete
-
-        current_app.logger.error("Unkown action {action}.".format(
-            action=action))
-        return []
-
-    # @property
-    # def excludes(self):
-    #     excludes = []
-    #     for needs_generator in self.permission_list:
-    #         tmp_excludes = None
-    #         if isinstance(needs_generator, _RecordNeedClass):
-    #             tmp_excludes = needs_generator.excludes(self.record)
-    #         elif isinstance(needs_generator, _BucketNeedClass):
-    #             tmp_excludes = needs_generator.needs(self.bucket)
-    #         elif isinstance(needs_generator, _NeedClass):
-    #             tmp_excludes = needs_generator.excludes()
-    #         else:
-    #             _unknwon_generator(type(needs_generator).__name__)
-
-    #         if tmp_excludes:
-    #             excludes.extend(tmp_excludes)
-
-    #     self.explicit_needs = self.explicit_needs.union(excludes)
-    #     self._load_permissions()
-
-    #     return self._permissions.excludes
-
-    # @property
-    # def query_filter(self):
-    #     query_filters = []
-    #     for qf_generator in self.permission_list:
-    #         tmp_query_filter = None
-    #         if isinstance(qf_generator, _RecordNeedClass):
-    #             tmp_query_filter = qf_generator.query_filter()
-    #         elif isinstance(qf_generator, _NeedClass):
-    #             tmp_query_filter = qf_generator.query_filter()
-    #         else:
-    #             _unknwon_generator(type(qf_generator).__name__)
-
-    #         if tmp_query_filter:
-    #             query_filters.append(tmp_query_filter)
-
-    #     return query_filters
 
 
 def record_read_permission_factory(record=None):
